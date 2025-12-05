@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數比大小實驗室</title>
+    <style>
+        :root {
+            --bg-color: #f0f8ff;
+            --panel-color: #ffffff;
+            --primary-color: #4a90e2;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none; /* 防止拖曳時選取文字 */
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        /* 控制面板 */
+        .controls {
+            background: var(--panel-color);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 30px;
+            max-width: 800px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .control-group label {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select, input[type="number"] {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        input[type="color"] {
+            border: none;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            background: none;
+        }
+
+        /* 畫布區域 */
+        #canvas-area {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 900px;
+            height: 500px; /* 足夠的空間進行拖曳 */
+            position: relative;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 2px dashed #ddd;
+        }
+
+        .fraction-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 50px;
+            position: relative;
+        }
+
+        .fraction-label {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #555;
+            pointer-events: none; /* 讓滑鼠可以穿過文字 */
+        }
+
+        /* SVG 樣式 */
+        svg {
+            overflow: visible; /* 允許圖形被拖出 SVG 邊界 */
+            cursor: grab;
+        }
+
+        svg:active {
+            cursor: grabbing;
+        }
+
+        .draggable-part {
+            transition: opacity 0.2s;
+            filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.2));
+        }
+
+        .draggable-part:hover {
+            opacity: 0.9;
+            stroke: #333;
+            stroke-width: 2px;
+        }
+
+        .dragging {
+            opacity: 0.7; /* 拖曳時變透明，方便比較 */
+            z-index: 1000;
+        }
+
+        /* 背景的空框線 */
+        .outline {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 2px;
+            pointer-events: none; /* 只有有顏色的部分可以拖曳 */
+        }
+
+        /* 提示訊息 */
+        .instruction {
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9rem;
+            background: #eef;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>三年級分數比較實驗室</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>圖形形狀</label>
+            <select id="shapeType" onchange="renderAll()">
+                <option value="circle">圓形 (披薩)</option>
+                <option value="bar">長條形 (巧克力)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label style="color: #e74c3c;">左邊分數 (A)</label>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <input type="number" id="num1" value="1" min="0" max="12" style="width:50px" onchange="renderAll()">
+                <span>/</span>
+                <input type="number" id="den1" value="3" min="1" max="12" style="width:50px" onchange="renderAll()">
+                <input type="color" id="color1" value="#e74c3c" onchange="renderAll()">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label style="color: #3498db;">右邊分數 (B)</label>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <input type="number" id="num2" value="1" min="0" max="12" style="width:50px" onchange="renderAll()">
+                <span>/</span>
+                <input type="number" id="den2" value="4" min="1" max="12" style="width:50px" onchange="renderAll()">
+                <input type="color" id="color2" value="#3498db" onchange="renderAll()">
+            </div>
+        </div>
+        
+        <div class="control-group">
+             <label>重置位置</label>
+             <button onclick="renderAll()" style="padding:8px 15px; cursor:pointer; background:#666; color:white; border:none; border-radius:5px;">歸位</button>
+        </div>
+    </div>
+
+    <div class="instruction">💡 試試看：用滑鼠按住有顏色的積木，把它拖曳到另一邊疊疊看，誰比較大？</div>
+
+    <div id="canvas-area">
+        <div class="fraction-container">
+            <div class="fraction-label" id="label1">1/3</div>
+            <div id="container1"></div>
+        </div>
+        
+        <div class="fraction-container">
+            <div class="fraction-label" id="label2">1/4</div>
+            <div id="container2"></div>
+        </div>
+    </div>
+
+    <script>
+        const SIZE = 200; // 圖形基礎大小
+        let currentDrag = null;
+        let offset = { x: 0, y: 0 };
+
+        function renderAll() {
+            const shape = document.getElementById('shapeType').value;
+            
+            // 讀取左邊數據
+            const n1 = parseInt(document.getElementById('num1').value);
+            const d1 = parseInt(document.getElementById('den1').value);
+            const c1 = document.getElementById('color1').value;
+            
+            // 讀取右邊數據
+            const n2 = parseInt(document.getElementById('num2').value);
+            const d2 = parseInt(document.getElementById('den2').value);
+            const c2 = document.getElementById('color2').value;
+
+            // 更新文字標籤
+            document.getElementById('label1').textContent = `${n1} / ${d1}`;
+            document.getElementById('label2').textContent = `${n2} / ${d2}`;
+
+            // 繪製圖形
+            drawFraction('container1', shape, n1, d1, c1, 'drag1');
+            drawFraction('container2', shape, n2, d2, c2, 'drag2');
+        }
+
+        function drawFraction(containerId, shape, num, den, color, dragId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = ''; // 清空
+
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("width", SIZE);
+            svg.setAttribute("height", SIZE);
+            svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
+            
+            // 1. 繪製底框 (代表 "1")
+            const outlineGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            outlineGroup.setAttribute("class", "outline");
+            
+            // 2. 繪製有顏色的部分 (代表分數，可拖曳)
+            const filledGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            filledGroup.setAttribute("class", "draggable-part");
+            filledGroup.setAttribute("id", dragId);
+            filledGroup.setAttribute("fill", color);
+
+            // 加入拖曳事件
+            addDragLogic(filledGroup);
+
+            if (shape === 'circle') {
+                const cx = SIZE / 2;
+                const cy = SIZE / 2;
+                const r = (SIZE / 2) - 5;
+
+                // 畫底圓
+                const bgCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                bgCircle.setAttribute("cx", cx);
+                bgCircle.setAttribute("cy", cy);
+                bgCircle.setAttribute("r", r);
+                outlineGroup.appendChild(bgCircle);
+                
+                // 畫分割線 (底圖)
+                for(let i=0; i<den; i++) {
+                    const angle = (i * 360 / den) - 90; // -90 讓起始點在12點鐘方向
+                    const rad = angle * Math.PI / 180;
+                    const x2 = cx + r * Math.cos(rad);
+                    const y2 = cy + r * Math.sin(rad);
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", cx);
+                    line.setAttribute("y1", cy);
+                    line.setAttribute("x2", x2);
+                    line.setAttribute("y2", y2);
+                    line.setAttribute("stroke", "#ccc");
+                    outlineGroup.appendChild(line);
+                }
+
+                // 畫扇形 (實心部分) - 為了方便比較，我們把所有份數合併成一個大扇形
+                // 如果需要分開一塊一塊，邏輯會不同，但比大小通常是比較「總量」
+                if (num > 0) {
+                     // 如果是大於等於1 (滿圓)
+                    if (num >= den) {
+                        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        circle.setAttribute("cx", cx);
+                        circle.setAttribute("cy", cy);
+                        circle.setAttribute("r", r);
+                        filledGroup.appendChild(circle);
+                    } else {
+                        // 畫扇形路徑
+                        const startAngle = -90;
+                        const endAngle = (num * 360 / den) - 90;
+                        const pathData = describeArc(cx, cy, r, startAngle, endAngle);
+                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        path.setAttribute("d", pathData);
+                        filledGroup.appendChild(path);
+                    }
+                }
+
+            } else {
+                // 長條形 Bar
+                const w = SIZE - 10;
+                const h = SIZE / 2; // 長條不需要那麼高
+                const x = 5;
+                const y = (SIZE - h) / 2;
+
+                // 畫底框
+                const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                bgRect.setAttribute("x", x);
+                bgRect.setAttribute("y", y);
+                bgRect.setAttribute("width", w);
+                bgRect.setAttribute("height", h);
+                outlineGroup.appendChild(bgRect);
+
+                // 畫分割線
+                const step = w / den;
+                for(let i=1; i<den; i++) {
+                    const lx = x + (i * step);
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", lx);
+                    line.setAttribute("y1", y);
+                    line.setAttribute("x2", lx);
+                    line.setAttribute("y2", y + h);
+                    line.setAttribute("stroke", "#ccc");
+                    outlineGroup.appendChild(line);
+                }
+
+                // 畫實心部分
+                if (num > 0) {
+                    const fillW = Math.min(w, w * (num / den)); // 避免超過框線
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("x", x);
+                    rect.setAttribute("y", y);
+                    rect.setAttribute("width", fillW);
+                    rect.setAttribute("height", h);
+                    filledGroup.appendChild(rect);
+                }
+            }
+
+            svg.appendChild(outlineGroup);
+            svg.appendChild(filledGroup);
+            container.appendChild(svg);
+        }
+
+        // SVG 圓弧計算函數
+        function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+            var angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+            // 修正座標系，讓其從上方開始順時針
+            angleInRadians = angleInDegrees * Math.PI / 180.0; 
+
+            return {
+                x: centerX + (radius * Math.cos(angleInRadians)),
+                y: centerY + (radius * Math.sin(angleInRadians))
+            };
+        }
+
+        function describeArc(x, y, radius, startAngle, endAngle) {
+            var start = polarToCartesian(x, y, radius, endAngle);
+            var end = polarToCartesian(x, y, radius, startAngle);
+            var largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+
+            var d = [
+                "M", x, y,
+                "L", start.x, start.y,
+                "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y,
+                "Z"
+            ].join(" ");
+
+            return d;
+        }
+
+        // 拖曳邏輯
+        function addDragLogic(element) {
+            let startX, startY, initialTransformX = 0, initialTransformY = 0;
+
+            element.addEventListener('mousedown', startDrag);
+            element.addEventListener('touchstart', startDrag, {passive: false});
+
+            function startDrag(e) {
+                e.preventDefault();
+                currentDrag = element;
+                
+                // 讀取當前的 transform (如果有)
+                const transform = currentDrag.getAttribute('transform');
+                if (transform) {
+                    const match = /translate\(([^,]+),([^)]+)\)/.exec(transform);
+                    if (match) {
+                        initialTransformX = parseFloat(match[1]);
+                        initialTransformY = parseFloat(match[2]);
+                    }
+                } else {
+                    initialTransformX = 0;
+                    initialTransformY = 0;
+                }
+
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+
+                startX = clientX;
+                startY = clientY;
+                
+                element.classList.add('dragging');
+
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('touchmove', drag, {passive: false});
+                document.addEventListener('mouseup', endDrag);
+                document.addEventListener('touchend', endDrag);
+            }
+
+            function drag(e) {
+                if (!currentDrag) return;
+                e.preventDefault();
+
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+
+                const dx = clientX - startX;
+                const dy = clientY - startY;
+
+                // 更新位置
+                const newX = initialTransformX + dx;
+                const newY = initialTransformY + dy;
+                
+                currentDrag.setAttribute('transform', `translate(${newX}, ${newY})`);
+            }
+
+            function endDrag() {
+                if (currentDrag) {
+                    currentDrag.classList.remove('dragging');
+                    currentDrag = null;
+                }
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('touchmove', drag);
+                document.removeEventListener('mouseup', endDrag);
+                document.removeEventListener('touchend', endDrag);
+            }
+        }
+
+        // 初始化
+        window.onload = renderAll;
+
+    </script>
+</body>
+</html>
